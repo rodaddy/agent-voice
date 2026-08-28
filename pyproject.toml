@@ -33,6 +33,7 @@ packages = ["src/agent_voice"]
 [tool.ruff]
 line-length = 88
 target-version = "py311"
+extend-exclude = ["*.md"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "D"]
