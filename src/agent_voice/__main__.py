@@ -1,4 +1,4 @@
-"""CLI: ``agent-voice speak | pipe | serve | voices | health``."""
+"""CLI: ``agent-voice speak | pipe | serve | voices | health | doctor``."""
 
 from __future__ import annotations
 
@@ -54,6 +54,9 @@ def _parser() -> argparse.ArgumentParser:
     sub.add_parser("health", help="check the TTS server and library").set_defaults(
         func=_health
     )
+    sub.add_parser(
+        "doctor", help="check everything and say how to fix it"
+    ).set_defaults(func=_doctor)
     return p
 
 
@@ -96,6 +99,14 @@ def _health(speaker: Speaker, _args: argparse.Namespace) -> int:
     }
     print(json.dumps(report, indent=2))
     return 0 if tts else 1
+
+
+def _doctor(speaker: Speaker, _args: argparse.Namespace) -> int:
+    from agent_voice.doctor import render, run
+
+    checks = run(speaker.config)
+    print(render(checks))
+    return 0 if all(c.ok or not c.required for c in checks) else 1
 
 
 if __name__ == "__main__":
