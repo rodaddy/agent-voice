@@ -40,7 +40,7 @@ def run(config: Config, *, transport: httpx.BaseTransport | None = None) -> list
     """Run every check and return the report."""
     return [
         _python(),
-        _player(),
+        _player(config),
         _tts(config, transport),
         *_voices(config),
         _writer(config, transport),
@@ -56,7 +56,7 @@ def _python() -> Check:
     )
 
 
-def _player() -> Check:
+def _player(config: Config) -> Check:
     if sys.platform == "win32":
         return Check("player", True, "winsound (built in)")
     argv = find_player()
@@ -68,6 +68,7 @@ def _player() -> Check:
         "no afplay / paplay / aplay / ffplay on PATH",
         "install ffmpeg (ffplay) or pulseaudio-utils (paplay); "
         "or set AGENT_VOICE_PLAY=false",
+        required=config.play,  # headless boxes that only save WAVs are fine
     )
 
 

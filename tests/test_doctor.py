@@ -1,9 +1,17 @@
 import json
 
 import httpx
+import pytest
 
+from agent_voice import doctor
 from agent_voice.config import Config
 from agent_voice.doctor import render, run
+
+
+@pytest.fixture(autouse=True)
+def _host_independent(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(doctor, "find_player", lambda: ["/usr/bin/afplay"])
+    monkeypatch.setattr(doctor.shutil, "which", lambda _name: "/usr/bin/ffmpeg")
 
 
 def _transport(tts_ok: bool, models: list[str]) -> httpx.MockTransport:
@@ -41,3 +49,15 @@ def test_no_voices(config: Config, tmp_path) -> None:  # type: ignore[no-untyped
     assert not by["voices"].ok and "ref.wav" in by["voices"].fix
     assert by["writer"].ok and not by["writer"].required
     assert json.dumps(by["writer"].detail)  # serializable, sanity
+
+
+def test_missing_player_is_only_fatal_when_playing(
+    config: Config, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(doctor, "find_player", lambda: None)
+    monkeypatch.setattr(doctor.sys, "platform", "linux")
+    playing = {c.name: c for c in run(config, transport=_transport(True, ["fake"]))}
+    assert not playing["player"].ok and playing["player"].required
+    silent = Config(**{**config.__dict__, "play": False})
+    quiet = {c.name: c for c in run(silent, transport=_transport(True, ["fake"]))}
+    assert not quiet["player"].ok and not quiet["player"].required
