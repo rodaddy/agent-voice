@@ -1,4 +1,8 @@
-"""Configuration from ``AGENT_VOICE_*`` environment variables."""
+"""Configuration from ``AGENT_VOICE_*`` environment variables.
+
+``agent-voice.env`` in the current directory (``KEY=VALUE`` lines, optional
+``export``, ``#`` comments) is read first; real environment variables win.
+"""
 
 from __future__ import annotations
 
@@ -9,13 +13,14 @@ from pathlib import Path
 from typing import Any
 
 PREFIX = "AGENT_VOICE_"
+ENV_FILE = Path("agent-voice.env")
 
 
 @dataclass(frozen=True)
 class Config:
     """Every knob; the environment variable that sets it is in the comment."""
 
-    tts_url: str = "http://127.0.0.1:8000"  # AGENT_VOICE_TTS_URL
+    tts_url: str = "http://127.0.0.1:8181"  # AGENT_VOICE_TTS_URL
     voices_dir: Path = Path("voices")  # AGENT_VOICE_VOICES_DIR
     voice: str = ""  # AGENT_VOICE_VOICE (default: first voice in the library)
     llm_url: str = ""  # AGENT_VOICE_LLM_URL (OpenAI-compatible base; "" = no writer)
@@ -30,9 +35,14 @@ class Config:
     port: int = 7161  # AGENT_VOICE_PORT
 
     @classmethod
-    def from_env(cls, env: Mapping[str, str] | None = None) -> Config:
-        """Build a config from ``env`` (default ``os.environ``)."""
-        source = os.environ if env is None else env
+    def from_env(
+        cls, env: Mapping[str, str] | None = None, env_file: Path | None = ENV_FILE
+    ) -> Config:
+        """Build a config from ``env_file`` then ``env`` (default ``os.environ``)."""
+        source: dict[str, str] = {}
+        if env_file is not None and env_file.is_file():
+            source.update(read_env_file(env_file))
+        source.update(os.environ if env is None else env)
         cfg = cls()
         values: dict[str, Any] = {}
         for f in fields(cls):
@@ -57,3 +67,18 @@ def _coerce(current: object, raw: str) -> object:
     if isinstance(current, float):
         return float(raw)
     return raw
+
+
+def read_env_file(path: Path) -> dict[str, str]:
+    """Parse ``KEY=VALUE`` lines (``export`` prefix, quotes, ``#`` comments ok)."""
+    values: dict[str, str] = {}
+    for raw in path.read_text(encoding="utf-8").splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.removeprefix("export ").partition("=")
+        value = value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in "'\"":
+            value = value[1:-1]
+        values[key.strip()] = value
+    return values

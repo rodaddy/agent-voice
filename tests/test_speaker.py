@@ -82,3 +82,14 @@ def test_config_from_env(tmp_path: Path) -> None:
         and c.guidance_scale == 1.5
     )
     assert not c.has_writer
+
+
+def test_env_file_then_environment_wins(tmp_path: Path) -> None:
+    f = tmp_path / "agent-voice.env"
+    f.write_text(
+        "# comment\nexport AGENT_VOICE_TTS_URL=http://file:1\n"
+        'AGENT_VOICE_PORT="7199"\n\nAGENT_VOICE_MAX_WORDS=20\n'
+    )
+    c = Config.from_env({"AGENT_VOICE_PORT": "7100"}, env_file=f)
+    assert c.tts_url == "http://file:1" and c.port == 7100 and c.max_words == 20
+    assert Config.from_env({}, env_file=tmp_path / "missing").tts_url.endswith(":8181")
